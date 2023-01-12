@@ -25,14 +25,15 @@
                 ValueChanged="FocusValueSlider_ValueChanged"
                 Value="500" />
 			<StackPanel Orientation="Horizontal">
-				<Button Click="PhotographButton_Click" Content="启动摄像头" />
-				<Button
-                    Margin="50,0,0,0"
-                    Click="CapturePhoto_Click"
-                    Content="拍照" />
+                <Button Click="PhotographButton_Click" Content="WebCam" />
                 <Button
                     Margin="50,0,0,0"
-                    Content="停止" Click="Stop_Click" />
+                    Name="ScreenShare"
+                    Click="ScreenShare_Click"
+                    Content="Screen Share" />
+                <Button
+                    Margin="50,0,0,0"
+                    Content="Stop" Click="Stop_Click" />
 			</StackPanel>
 		</StackPanel>
 	</Grid>

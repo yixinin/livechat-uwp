@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -28,7 +29,8 @@ namespace Livechat_UWP
         {
             ws = new ClientWebSocket();
             ws.ConnectAsync(new Uri(url), CancellationToken.None).Wait();
-            data = new byte[4096];
+
+            data = new byte[10 * 1024 * 1024];
         }
 
         public bool CanRead { get { return false; } }
@@ -46,6 +48,7 @@ namespace Livechat_UWP
                 this.ws.SendAsync(buf, WebSocketMessageType.Binary, false, CancellationToken.None).Wait();
             }
             position = 0;
+            length = 0;
         }
 
         public long Length
@@ -81,9 +84,13 @@ namespace Livechat_UWP
                     position -= offset;
                     break;
             }
+            if (position == 0)
+            {
+                length = 0;
+            }
             return position;
         }
-        public void Seek(ulong offset)
+        void IRandomAccessStream.Seek(ulong offset)
         {
             this.Seek(offset, SeekOrigin.Begin);
         }
@@ -108,22 +115,21 @@ namespace Livechat_UWP
                 {
                     data[i] = buffer[n];
                     n++;
+                    if ((ulong)length <= position)
+                    {
+                        length++;
+                    }
+
+                    position++;
 
                     if (i == data.Length - 1)
                     {
-                        position = 0;
-                        this.ws.SendAsync(data, WebSocketMessageType.Binary, false, CancellationToken.None).Wait();
+                        this.Flush();
                         break;
                     }
                 }
             }
-            if (position > 0)
-            {
-                var buf = new byte[position];
-                Array.Copy(data, buf, (int)position);
-                this.ws.SendAsync(buf, WebSocketMessageType.Binary, false, CancellationToken.None).Wait();
-            }
-            position = 0;
+            this.Flush();
         }
 
         public IInputStream GetInputStreamAt(ulong position)
@@ -140,13 +146,22 @@ namespace Livechat_UWP
 
         public IRandomAccessStream CloneStream()
         {
-            var s = new WebsocketPushStream();
+            var webSocketUrl = "ws://172.16.67.134:9902/live/ws";
+            var s = new WebsocketPushStream(webSocketUrl);
             s.Position = this.Position;
             this.data.CopyTo(s.data, 0);
             return s;
         }
 
         ulong IRandomAccessStream.Position => this.Position;
+        ulong IRandomAccessStream.Size
+        {
+            set => this.Size = value;
+            get
+            {
+                return this.Size;
+            }
+        }
 
 
 
@@ -172,23 +187,21 @@ namespace Livechat_UWP
                         {
                             data[i] = buffer.ToArray()[n];
                             n++;
+                            position++;
+                            if ((ulong)length <= position)
+                            {
+                                length++;
+                            }
                             token.ThrowIfCancellationRequested();
                             progress.Report(n);
                             if (i == data.Length - 1)
                             {
-                                position = 0;
-                                this.ws.SendAsync(data, WebSocketMessageType.Binary, false, CancellationToken.None).Wait();
+                                this.Flush();
                                 break;
                             }
                         }
                     }
-                    if (position > 0)
-                    {
-                        var buf = new byte[position];
-                        Array.Copy(data, buf, (int)position);
-                        this.ws.SendAsync(buf, WebSocketMessageType.Binary, false, CancellationToken.None).Wait();
-                    }
-                    position = 0;
+                    this.Flush();
                     return n;
 
                 }, token));
@@ -210,6 +223,6 @@ namespace Livechat_UWP
             this.ws.Dispose();
         }
 
-        public ulong Size { get => (ulong)data.Length; set => throw new NotImplementedException(); }
+        public ulong Size { get => (ulong)data.Length; set => this.data = new byte[value]; }
     }
 }
