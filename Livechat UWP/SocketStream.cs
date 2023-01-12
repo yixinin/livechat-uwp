@@ -15,23 +15,35 @@ namespace Livechat_UWP
     public class SocketStream : IOutputStream, IRandomAccessStream
     {
 
+        private ulong pos = 0;
+
         //IOutputStream socket;
         private StreamSocket _socket;
         public SocketStream(string host, uint port)
         {
             _socket = new StreamSocket();
             _socket.ConnectAsync(new HostName(host), port.ToString()).AsTask().Wait();
+
             //this.socket = _socket.OutputStream;
             Debug.WriteLine(_socket.OutputStream == null);
         }
         public IAsyncOperationWithProgress<uint, uint> WriteAsync(IBuffer buffer)
         {
-            return _socket.OutputStream.WriteAsync(buffer);
+            var p = pos;
+            IProgress<uint> progress = new Progress<uint>((val) =>
+            {
+                pos = p + val;
+            });
+            var t = _socket.OutputStream.WriteAsync(buffer);
+            t.AsTask(progress);
+            return t;
         }
 
         public IAsyncOperation<bool> FlushAsync()
         {
-            return _socket.OutputStream.FlushAsync();
+            var t = _socket.OutputStream.FlushAsync();
+            pos = 0;
+            return t;
         }
 
         public void Seek(ulong pos)
@@ -41,7 +53,7 @@ namespace Livechat_UWP
 
         public void Dispose()
         {
-            _socket.Dispose();
+            this.Seek(0);
         }
 
         public IInputStream GetInputStreamAt(ulong position)
@@ -51,7 +63,7 @@ namespace Livechat_UWP
 
         public IOutputStream GetOutputStreamAt(ulong position)
         {
-            return _socket.OutputStream;
+            throw new NotImplementedException();
         }
 
         public IRandomAccessStream CloneStream()
@@ -67,7 +79,7 @@ namespace Livechat_UWP
         {
             get
             {
-                return 0;
+                return pos;
             }
             set
             {
