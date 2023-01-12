@@ -63,8 +63,8 @@ namespace Livechat_UWP
                     VideoDeviceId = cameraDevice.Id
                 };
                 await captureManager.InitializeAsync(settings);
-
-                using (var s = new ProducerConsumerStream())
+                var webSocketUrl = "ws://172.16.67.134:9902/live/ws";
+                using (var s = new WebsocketPushStream(webSocketUrl))
                 {
 
                     //var stream = s.AsRandomAccessStream();
