@@ -12,10 +12,12 @@ using Windows.Storage.Streams;
 
 namespace Livechat_UWP
 {
-    public class SocketStream : IOutputStream, IRandomAccessStream
+    public class SocketStream : IRandomAccessStream
     {
 
         private ulong pos = 0;
+
+        IRandomAccessStream rs = null;
 
         //IOutputStream socket;
         private StreamSocket _socket;
@@ -24,11 +26,14 @@ namespace Livechat_UWP
             _socket = new StreamSocket();
             _socket.ConnectAsync(new HostName(host), port.ToString()).AsTask().Wait();
 
+            var ms = new MemoryStream();
+            rs = ms.AsRandomAccessStream();
             //this.socket = _socket.OutputStream;
-            Debug.WriteLine(_socket.OutputStream == null);
         }
         public IAsyncOperationWithProgress<uint, uint> WriteAsync(IBuffer buffer)
         {
+
+            rs.WriteAsync(buffer);
             var p = pos;
             IProgress<uint> progress = new Progress<uint>((val) =>
             {
@@ -41,6 +46,7 @@ namespace Livechat_UWP
 
         public IAsyncOperation<bool> FlushAsync()
         {
+            rs.FlushAsync();
             var t = _socket.OutputStream.FlushAsync();
             pos = 0;
             return t;
@@ -48,6 +54,7 @@ namespace Livechat_UWP
 
         public void Seek(ulong pos)
         {
+            rs.Seek(pos);
             this.FlushAsync().AsTask().Wait();
         }
 
@@ -63,47 +70,32 @@ namespace Livechat_UWP
 
         public IOutputStream GetOutputStreamAt(ulong position)
         {
-            throw new NotImplementedException();
+            return rs.GetOutputStreamAt(position);
         }
 
         public IRandomAccessStream CloneStream()
         {
-            throw new NotImplementedException();
+            return rs.CloneStream();
         }
 
         public bool CanRead => false;
 
         public bool CanWrite => true;
 
-        public ulong Position
-        {
-            get
-            {
-                return pos;
-            }
-            set
-            {
-                Seek(0);
-            }
-        }
-
-        public ulong size = 10 * 1024 * 1024;
-
-        public ulong Size
-        {
-            set
-            {
-                size = value;
-            }
-            get
-            {
-                return size;
-            }
-        }
+        public ulong Position => rs.Position;
 
         public IAsyncOperationWithProgress<IBuffer, uint> ReadAsync(IBuffer buffer, uint count, InputStreamOptions options)
         {
             throw new NotImplementedException();
+        }
+
+        ulong IRandomAccessStream.Size
+        {
+            get
+            {
+                return rs.Size;
+            }
+            set => throw new NotImplementedException();
         }
     }
 }

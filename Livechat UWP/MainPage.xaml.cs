@@ -62,7 +62,7 @@ namespace Livechat_UWP
         private GraphicsCaptureSession _session;
         private bool _closed;
         private Multithread _multithread;
-        string host = "172.23.127.177";
+        string host = "192.168.1.3";
         uint port = 9901;
 
         private const string webSocketUrl = "ws://192.168.1.3:9902/live/ws/push";
@@ -105,7 +105,7 @@ namespace Livechat_UWP
                 {
                     var encodingProfile = MediaEncodingProfile.CreateHevc(VideoEncodingQuality.HD1080p);
                     Debug.WriteLine(encodingProfile.Video.Subtype);
-                    //await captureManager.StartRecordToStreamAsync(encodingProfile, stream.AsStreamForWrite().AsOutputStream());
+                    await captureManager.StartRecordToStreamAsync(encodingProfile, stream);
                 }
 
             }
