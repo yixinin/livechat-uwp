@@ -1,39 +1,37 @@
-﻿using SharpDX.Direct3D11;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.WebSockets;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
+using Windows.Networking;
 using Windows.Networking.Sockets;
 using Windows.Storage.Streams;
 
 namespace Livechat_UWP
 {
-    class WebsocketPushStream : IRandomAccessStream
+    internal class SocketPushStream : IRandomAccessStream
     {
-        private readonly StreamWebSocket ws;
+        private readonly StreamSocket socket;
 
         private byte[] data;
+        string host;
+        uint port;
 
         private ulong position;
         private long length;
         private readonly string url;
         private bool cloed = false;
         private ulong count = 0;
-        public WebsocketPushStream(String _url)
+        public SocketPushStream(string host, uint port)
         {
-            this.url = _url;
-            ws = new StreamWebSocket();
-            ws.ConnectAsync(new Uri(url)).AsTask().Wait();
+            this.host = host;
+            this.port = port;
+            socket = new StreamSocket();
+            socket.ConnectAsync(new HostName(host), port.ToString()).AsTask().Wait();
 
             data = new byte[10 * 1024 * 1024];
         }
@@ -50,8 +48,8 @@ namespace Livechat_UWP
             {
                 var buf = new byte[this.Position];
                 Array.Copy(data, buf, (int)this.Position);
-                var n = this.ws.OutputStream.WriteAsync(buf.AsBuffer()).GetResults();
-                this.ws.OutputStream.FlushAsync().AsTask().Wait();
+                var n = this.socket.OutputStream.WriteAsync(buf.AsBuffer()).GetResults();
+                this.socket.OutputStream.FlushAsync().AsTask().Wait();
                 Debug.WriteLine(string.Format("send data {0}", n));
             }
             this.Position = 0;
@@ -159,10 +157,15 @@ namespace Livechat_UWP
 
         public IRandomAccessStream CloneStream()
         {
-            var s = new WebsocketPushStream(url);
+            var s = new SocketPushStream(this.host, port);
             s.Position = this.Position;
             this.data.CopyTo(s.data, 0);
             return s;
+        }
+
+        public IOutputStream Out()
+        {
+            return socket.OutputStream;
         }
 
         ulong IRandomAccessStream.Position => this.Position;
@@ -233,30 +236,31 @@ namespace Livechat_UWP
         {
             return AsyncInfo.Run((token) =>
               Task.Run(async () =>
-                {
-                    if (!cloed && this.Position > 0)
-                    {
-                        var buf = new byte[this.Position];
-                        Array.Copy(this.data, buf, (int)this.Position);
-                        var n = await this.ws.OutputStream.WriteAsync(buf.AsBuffer());
-                        Debug.WriteLine(string.Format("send data: {0}", n));
-                        await this.ws.OutputStream.FlushAsync();
-                    }
-                    this.Position = 0;
-                    this.length = 0;
-                    token.ThrowIfCancellationRequested();
-                    return true;
-                }, token));
+              {
+                  if (!cloed && this.Position > 0)
+                  {
+                      var buf = new byte[this.Position];
+                      Array.Copy(this.data, buf, (int)this.Position);
+                      var n = await this.socket.OutputStream.WriteAsync(buf.AsBuffer());
+                      Debug.WriteLine(string.Format("send data: {0}", n));
+                      await this.socket.OutputStream.FlushAsync();
+                  }
+                  this.Position = 0;
+                  this.length = 0;
+                  token.ThrowIfCancellationRequested();
+                  return true;
+              }, token));
         }
 
         public void Dispose()
         {
-            //if (!cloed)
-            //{
-            //    Debug.WriteLine("stream closed!");
-            //    cloed = true;
-            //    this.ws.Dispose();
-            //}
+            if (!cloed)
+            {
+                Debug.WriteLine("stream closed!");
+                cloed = true;
+                this.socket.Dispose();
+                App.Current.Exit();
+            }
         }
 
         public ulong Size { get => (ulong)data.Length; set => this.data = new byte[value]; }

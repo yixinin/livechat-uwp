@@ -62,7 +62,10 @@ namespace Livechat_UWP
         private GraphicsCaptureSession _session;
         private bool _closed;
         private Multithread _multithread;
+        string host = "172.23.127.177";
+        uint port = 9901;
 
+        private const string webSocketUrl = "ws://192.168.1.3:9902/live/ws/push";
         public MainPage()
         {
             this.InitializeComponent();
@@ -98,13 +101,11 @@ namespace Livechat_UWP
                     VideoDeviceId = cameraDevice.Id
                 };
                 await captureManager.InitializeAsync(settings);
-                var webSocketUrl = "ws://172.16.67.134:9902/live/ws";
-                using (var s = new WebsocketPushStream(webSocketUrl))
+                using (var stream = new SocketStream(host, port))
                 {
-
-                    //var stream = s.AsRandomAccessStream();
                     var encodingProfile = MediaEncodingProfile.CreateHevc(VideoEncodingQuality.HD1080p);
-                    await captureManager.StartRecordToStreamAsync(encodingProfile, s);
+                    Debug.WriteLine(encodingProfile.Video.Subtype);
+                    //await captureManager.StartRecordToStreamAsync(encodingProfile, stream.AsStreamForWrite().AsOutputStream());
                 }
 
             }
@@ -169,16 +170,15 @@ namespace Livechat_UWP
             await captureManager.StopRecordAsync();
         }
 
-        async private void ScreenShare_Click(object sender, RoutedEventArgs e)
+        private async void ScreenShare_Click(object sender, RoutedEventArgs e)
         {
-            await StartCaptureScreenAsync();
+            await SetupEncoding();
         }
 
 
         private async Task StartCaptureScreenAsync()
         {
-            var webSocketUrl = "ws://172.16.67.134:9902/live/ws";
-            using (var stream = new WebsocketPushStream(webSocketUrl))
+            using (var stream = new SocketStream(host, port))
             {
                 await this.SetupEncoding();
                 StartCapture();
@@ -352,6 +352,7 @@ namespace Livechat_UWP
             }
             catch (Exception ex)
             {
+                Debug.WriteLine(ex.ToString());
 
                 return;
             }
